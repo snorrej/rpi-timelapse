@@ -22,7 +22,7 @@ class SystemStats(Wrapper):
         self._CMD = 'vcgencmd'
 
     def stats(self):
-	return self.voltage() + ' ' + self.temperature()
+        return self.voltage() + ' ' + self.temperature()
 
     def voltage(self):
         code, out, err = self.call(self._CMD + ' measure_temp')
@@ -50,31 +50,86 @@ class Analyse(Wrapper):
             raise Exception(err)
         return out
 
-class RaspiStill(Wrapper):
-    """ A class which wraps calls to the external raspistill process. """
+class GPhoto(Wrapper):
+    """ A class which wraps calls to the external gphoto2 process. """
 
     def __init__(self, subprocess):
         Wrapper.__init__(self, subprocess)
-	# Create a thumbnail with a useful size for mean brightness checks
-        self._CMD = 'raspistill --nopreview --encoding jpg --width 1920 --height 1080 --quality 96 --thumb 480:270:80 --timeout 1 --awb off --awbgains 1.5,1.2'
+        self._CMD = '/usr/bin/gphoto2'
+        self._shutter_choices = None
+        self._aperture_choices = None
+        self._iso_choices = None
+
+    def get_camera_date_time(self):
+        code, out, err = self.call(self._CMD + " --get-config /main/settings/datetime")
+        timestr = None
+        for line in out.split('\n'):
+            if line.startswith('Current:'):
+                timestr = line[line.find(':'):]
+        if not timestr:
+            raise Exception('No time parsed from ' + out)
+        stime = time.strptime(timestr, ": %Y-%m-%d %H:%M:%S")
+        return stime
 
     def capture_image_and_download(self):
-	time = datetime.now()
-	filepath = os.path.dirname(os.path.realpath(__file__)) + "/photos"
-	filenamePrefix = "img"
-	shutter = str(eval(compile(self._shutter_choice, '<string>', 'eval', __future__.division.compiler_flag))*1000000)
-	filename = filepath + "/" + filenamePrefix + "-%04d%02d%02d-%02d%02d%02d.jpg" % (time.year, time.month, time.day, time.hour, time.minute, time.second)
-        code, out, err = self.call(self._CMD + ' --shutter ' + shutter + ' --ISO ' + self._iso_choice + ' --output ' + filename)
-        if code != 0:
-            raise Exception(err)
+        code, out, err = self.call(self._CMD + " --capture-image-and-download --filename '%Y%m%d%H%M%S.JPG'")
+        filename = None
+        for line in out.split('\n'):
+            if line.startswith('Saving file as '):
+                filename = line.split('Saving file as ')[1]
+                os.unlink('webkamera-tmp.jpg')
+                os.rename(filename,'webkamera-tmp.jpg')
+                os.unlink('webkamera.jpg')
+                os.symlink('webkamera-tmp.jpg','webkamera.jpg')
         return filename
 
-    def set_shutter_speed(self, secs=None):
+    def get_shutter_speeds(self):
+        code, out, err = self.call([self._CMD + " --get-config /main/capturesettings/shutterspeed"])
+        choices = {}
+        current = None
+        for line in out.split('\n'):
+            if line.startswith('Choice:'):
+                choices[line.split(' ')[2]] = line.split(' ')[1]
+            if line.startswith('Current:'):
+                current = line.split(' ')[1]
+        self._shutter_choices = choices
+        return current, choices
+
+    def set_shutter_speed(self, secs=None, index=None):
         code, out, err = None, None, None
         if secs:
-		self._shutter_choice = secs
+            if self._shutter_choices == None:
+                self.get_shutter_speeds()
+            code, out, err = self.call([self._CMD + " --set-config /main/capturesettings/shutterspeed=" + str(secs)])
+        if index:
+            code, out, err = self.call([self._CMD + " --set-config /main/capturesettings/shutterspeed=" + str(index)])
 
-    def set_iso(self, iso=None):
+    def get_iso(self):
+        code, out, err = self.call([self._CMD + " --get-config /main/imgsettings/iso"])
+        choices = {}
+        current = None
+        for line in out.split('\n'):
+            if line.startswith('Choice:'):
+                choices[line.split(' ')[2]] = line.split(' ')[1]
+            if line.startswith('Current:'):
+                current = line.split(' ')[1]
+        self._iso_choices = choices
+        return current, choices
+
+    def set_iso(self, iso=None, index=None):
         code, out, err = None, None, None
         if iso:
-		self._iso_choice = iso
+            if self._iso_choices == None:
+                self.get_iso()
+            code, out, err = self.call([self._CMD + " --set-config /main/imgsettings/iso=" + str(self._iso_choices[iso])])
+        if index:
+            code, out, err = self.call([self._CMD + " --set-config /main/imgsettings/iso=" + str(index)])
+
+    def get_model(self):
+	code, out, err = self.call([self._CMD + " --summary"])
+        model = {} 
+        for line in out.split('\n'):
+            if line.startswith('Model:'):
+                model = line.split(' ')
+                model.pop(0)
+        return ' '.join(model) 

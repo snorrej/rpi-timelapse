@@ -7,7 +7,7 @@ import time
 import sys
 import os
 
-from wrappers import RaspiStill
+from wrappers import GPhoto
 from wrappers import Analyse
 from wrappers import SystemStats
 
@@ -127,13 +127,13 @@ def main():
             sys.stdout.flush()
 
             if brightness < TARGET_BRIGHTNESS * 0.8 and current_config < len(CONFIGS) - 1:
-                if TARGET_BRIGHTNESS - brightness > TARGET_BRIGHTNESS * 0.333 and current_config < len(CONFIGS) - 3:
-                    current_config += 3
+                if TARGET_BRIGHTNESS - brightness > TARGET_BRIGHTNESS * 0.333 and current_config < len(CONFIGS) - 2:
+                    current_config += 2
                 else:
                     current_config += 1
             elif brightness > TARGET_BRIGHTNESS * 1.2 and current_config > 0:
-                if brightness - TARGET_BRIGHTNESS > TARGET_BRIGHTNESS * 0.333 and current_config > 3:
-                    current_config -= 3
+                if brightness - TARGET_BRIGHTNESS > TARGET_BRIGHTNESS * 0.333 and current_config > 2:
+                    current_config -= 2
                 else:
                     current_config -= 1
             else:
