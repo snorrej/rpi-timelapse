@@ -95,7 +95,7 @@ CONFIGS = [
 
 def main():
     print "Timelapse starting at %s" % (time.asctime())
-    camera = RaspiStill(subprocess)
+    camera = GPhoto(subprocess)
     info = Analyse(subprocess)
     sysinfo = SystemStats(subprocess)
 
@@ -111,6 +111,7 @@ def main():
             last_started = datetime.now()
             shot = shot + 1
             config = CONFIGS[current_config]
+            print "Shot %d : %s" % (shot, time.asctime())
             print "Shot %d : Shutter: %ss , ISO: %d , Ap: %s" % (shot, config[0], config[1], config[2])
             sys.stdout.flush()
 
@@ -131,32 +132,36 @@ def main():
               # Occasionally, capture can fail but retries will be successful.
               continue
             failures = 0
-            print "Shot: %d Filename: %s" % (shot, filename)
+            #print "Shot %d Filename: %s" % (shot, filename)
             sys.stdout.flush()
 
             prev_acquired = last_acquired
-            brightness = float(info.mean_brightness(filename))
+            brightness = float(info.mean_brightness('webkamera-tmp.jpg'))
             last_acquired = datetime.now()
 
-            health = sysinfo.stats()
+            #health = sysinfo.stats()
 
-            print "Shot: %d Brightness: %s System Health: %s" % (shot, brightness, health)
+            print "Shot %d : Brightness: %s " % (shot, brightness)
             sys.stdout.flush()
 
-            if brightness < TARGET_BRIGHTNESS * 0.8 and current_config < len(CONFIGS) - 1:
-                if TARGET_BRIGHTNESS - brightness > TARGET_BRIGHTNESS * 0.333 and current_config < len(CONFIGS) - 2:
+            if brightness < TARGET_BRIGHTNESS * 0.9 and current_config < len(CONFIGS) - 1:
+                if TARGET_BRIGHTNESS - brightness > TARGET_BRIGHTNESS * 0.44 and current_config < len(CONFIGS) - 2:
                     current_config += 2
+                    print "Shot %d : EV step: +2/3" % (shot)
                 else:
                     current_config += 1
-            elif brightness > TARGET_BRIGHTNESS * 1.2 and current_config > 0:
-                if brightness - TARGET_BRIGHTNESS > TARGET_BRIGHTNESS * 0.333 and current_config > 2:
+                    print "Shot %d : EV step: +1/3" % (shot)
+            elif brightness > TARGET_BRIGHTNESS * 1.1 and current_config > 0:
+                if brightness - TARGET_BRIGHTNESS > TARGET_BRIGHTNESS * 0.44 and current_config > 2:
                     current_config -= 2
+                    print "Shot %d : EV step: -2/3" % (shot)
                 else:
                     current_config -= 1
+                    print "Shot %d : EV step: -1/3" % (shot)
             else:
                 if last_started and last_acquired and last_acquired - last_started < MIN_INTER_SHOT_DELAY_SECONDS:
                     sleep_for = max((MIN_INTER_SHOT_DELAY_SECONDS - (last_acquired - last_started)).seconds, 0);
-                    print "Sleeping for %ss" % str(sleep_for)
+                    print "Sleeping for %ss ..." % str(sleep_for)
                     sys.stdout.flush()
                     time.sleep(sleep_for)
     except Exception,e:
