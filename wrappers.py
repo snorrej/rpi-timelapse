@@ -104,6 +104,27 @@ class GPhoto(Wrapper):
         if index:
             code, out, err = self.call([self._CMD + " --set-config /main/capturesettings/shutterspeed=" + str(index)])
 
+    def get_aperture(self):
+        code, out, err = self.call([self._CMD + " --get-config /main/capturesettings/shutterspeed"])
+        choices = {}
+        current = None
+        for line in out.split('\n'):
+            if line.startswith('Choice:'):
+                choices[line.split(' ')[2]] = line.split(' ')[1]
+            if line.startswith('Current:'):
+                current = line.split(' ')[1]
+        self._aperture_choices = choices
+        return current, choices
+
+    def set_aperture(self, ap=None, index=None):
+        code, out, err = None, None, None
+        if ap:
+            if self._aperture_choices == None:
+                self.get_aperture()
+            code, out, err = self.call([self._CMD + " --set-config /main/capturesettings/aperture=" + str(ap)])
+        if index:
+            code, out, err = self.call([self._CMD + " --set-config /main/capturesettings/aperture=" + str(index)])
+
     def get_iso(self):
         code, out, err = self.call([self._CMD + " --get-config /main/imgsettings/iso"])
         choices = {}
